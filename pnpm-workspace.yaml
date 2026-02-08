@@ -1,0 +1,4 @@
+packages:
+  - "game-client"
+  - "game-server"
+  - "shared"
