@@ -37,6 +37,39 @@ export class Game extends Scene {
         align: "center",
       })
       .setOrigin(0.5);
+
+    this.setupZoom();
+  }
+
+  private static readonly MIN_ZOOM = 0.25;
+  private static readonly MAX_ZOOM = 3;
+  private static readonly ZOOM_SENSITIVITY = 0.001;
+
+  private setupZoom() {
+    const canvas = this.sys.game.canvas;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const pointer = this.input.activePointer;
+      const worldX = this.camera.scrollX + pointer.x / this.camera.zoom;
+      const worldY = this.camera.scrollY + pointer.y / this.camera.zoom;
+
+      const delta = -e.deltaY * Game.ZOOM_SENSITIVITY;
+      const newZoom = Phaser.Math.Clamp(
+        this.camera.zoom + delta * this.camera.zoom,
+        Game.MIN_ZOOM,
+        Game.MAX_ZOOM
+      );
+
+      this.camera.setZoom(newZoom);
+      this.camera.setScroll(
+        worldX - pointer.x / newZoom,
+        worldY - pointer.y / newZoom
+      );
+    };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    this.events.once("shutdown", () =>
+      canvas.removeEventListener("wheel", onWheel)
+    );
   }
 
   /**
