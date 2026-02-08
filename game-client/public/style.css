@@ -1,15 +1,104 @@
+/*
+  Hordes — pixel-art zombie survival game.
+  Theme: dark, gritty, post-apocalyptic (decay, rust, aged metal).
+  These variables are shared with the in-game theme (see src/game/theme.ts)
+  for DOM overlays, HUD, and any HTML UI.
+*/
+:root {
+  /* Backgrounds & panels */
+  --bg-dark: #1a1814;
+  --bg-panel: #3a2e20;
+  --bg-panel-light: #5a4a35;
+  --bg-paper: #9b8b74;
+
+  /* Borders */
+  --border-dark: #282828;
+  --border-metal: #4a4a4a;
+  --border-rust: #6b5344;
+
+  /* Accents — buttons, highlights, active states */
+  --accent-rust: #cc5c20;
+  --accent-rust-muted: #a54b1a;
+  --accent-gold: #f0c060;
+  --accent-gold-dim: #e0a040;
+
+  /* Text */
+  --text-primary: #f0f0f0;
+  --text-secondary: #d0d0d0;
+  --text-muted: #9a9a9a;
+  --text-gold: #f0c060;
+
+  /* Status */
+  --status-success: #7a9a6e;
+  --status-warning: #c49450;
+  --status-error: #b54a4a;
+}
+
 body {
-    margin: 0;
-    padding: 0;
-    color: rgba(255, 255, 255, 0.87);
-    background-color: #0f0f0f;
+  margin: 0;
+  padding: 0;
+  color: var(--text-primary);
+  background-color: var(--bg-dark);
+  font-family: Arial, sans-serif;
 }
 
 #app {
-    width: 100%;
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Canvas container — crisp pixels for pixel-art */
+#game-container {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#game-container canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Reusable form controls (inputs, buttons) — match in-game theme */
+.hordes-input,
+.hordes-input:focus {
+  background-color: var(--bg-panel);
+  color: var(--text-primary);
+  border: 2px solid var(--border-rust);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 16px;
+  outline: none;
+}
+
+.hordes-input::placeholder {
+  color: var(--text-muted);
+}
+
+.hordes-input:focus {
+  border-color: var(--accent-rust);
+  box-shadow: 0 0 0 1px var(--accent-rust-muted);
+}
+
+.hordes-btn {
+  background-color: var(--bg-panel-light);
+  color: var(--text-primary);
+  border: 2px solid var(--border-rust);
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.hordes-btn:hover {
+  border-color: var(--accent-rust);
+  color: var(--accent-gold);
+}
+
+.hordes-btn:active {
+  background-color: var(--accent-rust-muted);
 }

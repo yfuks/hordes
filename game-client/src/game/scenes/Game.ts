@@ -1,35 +1,48 @@
-import { Scene } from 'phaser';
+import { Scene } from "phaser";
 
-export class Game extends Scene
-{
-    camera: Phaser.Cameras.Scene2D.Camera;
-    background: Phaser.GameObjects.Image;
-    msg_text : Phaser.GameObjects.Text;
+export interface GameSceneData {
+  roomId?: string;
+}
 
-    constructor ()
-    {
-        super('Game');
-    }
+export class Game extends Scene {
+  camera!: Phaser.Cameras.Scene2D.Camera;
+  background!: Phaser.GameObjects.Image;
+  msg_text!: Phaser.GameObjects.Text;
+  roomId: string | null = null;
 
-    create ()
-    {
-        this.camera = this.cameras.main;
-        this.camera.setBackgroundColor(0x00ff00);
+  constructor() {
+    super("Game");
+  }
 
-        this.background = this.add.image(512, 384, 'background');
-        this.background.setAlpha(0.5);
+  init(data: GameSceneData) {
+    this.roomId = data?.roomId ?? null;
+  }
 
-        this.msg_text = this.add.text(512, 384, 'Make something fun!\nand share it with us:\nsupport@phaser.io', {
-            fontFamily: 'Arial Black', fontSize: 38, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        });
-        this.msg_text.setOrigin(0.5);
+  create() {
+    this.camera = this.cameras.main;
+    this.camera.setBackgroundColor(0x00ff00);
 
-        this.input.once('pointerdown', () => {
+    this.background = this.add.image(512, 384, "background");
+    this.background.setAlpha(0.5);
 
-            this.scene.start('GameOver');
+    const roomLabel = this.roomId ? `Room: ${this.roomId}` : "No room";
+    this.msg_text = this.add.text(
+      512,
+      384,
+      `${roomLabel}\n\n(Placeholder – game logic here)`,
+      {
+        fontFamily: "Arial Black",
+        fontSize: 28,
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 6,
+        align: "center",
+      }
+    );
+    this.msg_text.setOrigin(0.5);
 
-        });
-    }
+    this.input.once("pointerdown", () => {
+      this.scene.start("GameOver");
+    });
+  }
 }
