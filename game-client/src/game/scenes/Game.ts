@@ -1,12 +1,14 @@
 import { Scene } from "phaser";
+import { ISO_TILE_HEIGHT, ISO_TILE_WIDTH } from "../assets/isoTileset";
 
 export interface GameSceneData {
   roomId?: string;
 }
 
+/** Game scene – isometric view, tilemap-based (per AGENTS.md) */
 export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
-  background!: Phaser.GameObjects.Image;
+  isoLayer!: Phaser.Tilemaps.TilemapLayer;
   msg_text!: Phaser.GameObjects.Text;
   roomId: string | null = null;
 
@@ -20,25 +22,82 @@ export class Game extends Scene {
 
   create() {
     this.camera = this.cameras.main;
-    this.camera.setBackgroundColor(0x00ff00);
+    this.camera.setBackgroundColor(0x1a1a2e);
 
-    this.background = this.add.image(512, 384, "background");
-    this.background.setAlpha(0.5);
+    this.createIsometricMap();
 
     const roomLabel = this.roomId ? `Room: ${this.roomId}` : "No room";
-    this.msg_text = this.add.text(
-      512,
-      384,
-      `${roomLabel}\n\n(Placeholder – game logic here)`,
-      {
+    this.msg_text = this.add
+      .text(512, 40, `${roomLabel} – Isometric view`, {
         fontFamily: "Arial Black",
-        fontSize: 28,
+        fontSize: 20,
         color: "#ffffff",
         stroke: "#000000",
-        strokeThickness: 6,
+        strokeThickness: 4,
         align: "center",
-      }
+      })
+      .setOrigin(0.5);
+  }
+
+  /**
+   * Creates isometric tilemap per Phaser docs:
+   * - Orientation.ISOMETRIC, 64x32 grid (2:1 ratio)
+   * - addTilesetImage with texture key and tile dimensions
+   * - createBlankLayer with offset for centering
+   */
+  private createIsometricMap() {
+    const mapWidth = 12;
+    const mapHeight = 12;
+
+    const mapData = new Phaser.Tilemaps.MapData({
+      width: mapWidth,
+      height: mapHeight,
+      tileWidth: ISO_TILE_WIDTH,
+      tileHeight: ISO_TILE_HEIGHT,
+      orientation: Phaser.Tilemaps.Orientation.ISOMETRIC,
+      format: Phaser.Tilemaps.Formats.ARRAY_2D,
+    });
+
+    const map = new Phaser.Tilemaps.Tilemap(this, mapData);
+    const tileset = map.addTilesetImage(
+      "iso-tiles",
+      "iso-tiles",
+      ISO_TILE_WIDTH,
+      ISO_TILE_HEIGHT
     );
-    this.msg_text.setOrigin(0.5);
+
+    if (!tileset) {
+      console.error("iso-tiles texture missing – ensure Preloader created it");
+      this.add.text(512, 384, "Tileset not loaded", {
+        fontFamily: "Arial",
+        fontSize: 24,
+        color: "#ff6666",
+      }).setOrigin(0.5);
+      return;
+    }
+
+    const offsetX = 350;
+    const offsetY = 180;
+    this.isoLayer = map.createBlankLayer("ground", tileset, offsetX, offsetY)!;
+
+    const groundData = this.generateGroundTiles(mapWidth, mapHeight);
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const index = groundData[y][x];
+        this.isoLayer.putTileAt(index, x, y);
+      }
+    }
+  }
+
+  private generateGroundTiles(width: number, height: number): number[][] {
+    const tiles: number[][] = [];
+    for (let y = 0; y < height; y++) {
+      const row: number[] = [];
+      for (let x = 0; x < width; x++) {
+        row.push((x + y) % 16);
+      }
+      tiles.push(row);
+    }
+    return tiles;
   }
 }

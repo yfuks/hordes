@@ -8,6 +8,7 @@ export class MainMenu extends Scene {
   logo!: GameObjects.Image;
   roomInput!: HTMLInputElement;
   statusText!: GameObjects.Text;
+  private offlineBtn?: HTMLButtonElement;
 
   constructor() {
     super("MainMenu");
@@ -20,6 +21,14 @@ export class MainMenu extends Scene {
     this.statusText = this.add
       .text(512, 670, "", textStyles.status)
       .setOrigin(0.5);
+
+    // Always add "Play offline" so user can escape if stuck
+    this.addPlayOfflineButton();
+
+    this.events.on("shutdown", () => {
+      this.roomInput?.parentNode?.removeChild(this.roomInput);
+      this.offlineBtn?.remove();
+    });
 
     const roomId = getRoomIdFromPage();
     if (roomId) {
@@ -49,7 +58,7 @@ export class MainMenu extends Scene {
     inputEl.className = "hordes-input";
     inputEl.style.cssText = `
       position: absolute; left: 50%; top: 500px; transform: translate(-50%, -50%);
-      width: 220px; text-align: center;
+      width: 220px; text-align: center; z-index: 1;
     `;
     this.roomInput = inputEl;
     this.scale.parent?.appendChild(inputEl);
@@ -74,10 +83,19 @@ export class MainMenu extends Scene {
       .on("pointerout", () => createRoomBtn.setStyle(textStyles.button));
 
     createRoomBtn.on("pointerdown", () => this.onCreateRoom());
+  }
 
-    this.events.on("shutdown", () => {
-      if (this.roomInput?.parentNode) this.roomInput.parentNode.removeChild(this.roomInput);
-    });
+  private addPlayOfflineButton() {
+    const btn = document.createElement("button");
+    btn.textContent = "Play offline";
+    btn.className = "hordes-btn";
+    btn.style.cssText = `
+      position: absolute; top: 16px; right: 16px; z-index: 10;
+      cursor: pointer;
+    `;
+    btn.onclick = () => this.scene.start("Game", { roomId: "offline" });
+    this.offlineBtn = btn;
+    this.scale.parent?.appendChild(btn);
   }
 
   private setStatus(msg: string, isError = false) {
@@ -104,7 +122,8 @@ export class MainMenu extends Scene {
       this.scene.start("Game", { roomId });
     } catch (e) {
       clearStoredRoomId();
-      this.setStatus("Could not join room. Try again or create one.", true);
+      const msg = e instanceof Error ? e.message : String(e);
+      this.setStatus(msg || "Could not join room. Try again or create one.", true);
       this.addBackToMenuButton();
     }
   }
@@ -120,7 +139,8 @@ export class MainMenu extends Scene {
       await joinRoom(id);
       this.scene.start("Game", { roomId: id });
     } catch (e) {
-      this.setStatus("Room not found or full. Try another ID or create a room.", true);
+      const msg = e instanceof Error ? e.message : String(e);
+      this.setStatus(msg || "Room not found or full. Try another ID or create a room.", true);
     }
   }
 
@@ -130,7 +150,9 @@ export class MainMenu extends Scene {
       const { roomId } = await createRoom();
       this.scene.start("Game", { roomId });
     } catch (e) {
-      this.setStatus("Could not create room. Is the server running?", true);
+      const msg = e instanceof Error ? e.message : String(e);
+      this.setStatus(msg || "Could not create room. Is the server running?", true);
+      this.addBackToMenuButton();
     }
   }
 }
