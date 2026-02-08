@@ -12,11 +12,11 @@
 export const ISO_TILE_WIDTH = 64;
 export const ISO_TILE_HEIGHT = 32;
 
-/** Palette – post‑apocalyptic, decay (per theme) */
+/** Palette – sand / dirt ground (simple environment) */
 const COLORS = [
-  0x3d5a3c, 0x4a6b49, 0x5a7a58, 0x6b8a68, 0x2d4a2e, 0x3a5a3b, 0x4a6a48,
-  0x5a7a56, 0x253d26, 0x324d33, 0x425d42, 0x526d52, 0x364a37, 0x435a44,
-  0x536a54, 0x637a64,
+  0xc4a574, 0xb8956b, 0xa88462, 0x9a7358, 0xd4b88a, 0xc9a97a, 0xbe9a6e,
+  0xb38b64, 0x8b6b4a, 0x7d5f42, 0x6f533a, 0x614732, 0xa07d52, 0x93704a,
+  0x866344, 0x79563e,
 ];
 
 /**
@@ -43,21 +43,25 @@ export function createIsoTilesetTexture(textures: Phaser.Textures.TextureManager
       const x = col * ISO_TILE_WIDTH;
       const y = row * ISO_TILE_HEIGHT;
 
-      // Flat isometric diamond – fills 64x32 cell (top, right, bottom, left)
+      // Flat isometric diamond – fills 64x32 cell, no gap (tiles touch)
       const cx = x + ISO_TILE_WIDTH / 2;
-      const top = y + 2;
-      const bottom = y + ISO_TILE_HEIGHT - 2;
+      const top = y;
+      const bottom = y + ISO_TILE_HEIGHT;
 
       ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
       ctx.beginPath();
       ctx.moveTo(cx, top);
-      ctx.lineTo(x + ISO_TILE_WIDTH - 2, y + ISO_TILE_HEIGHT / 2);
+      ctx.lineTo(x + ISO_TILE_WIDTH, y + ISO_TILE_HEIGHT / 2);
       ctx.lineTo(cx, bottom);
-      ctx.lineTo(x + 2, y + ISO_TILE_HEIGHT / 2);
+      ctx.lineTo(x, y + ISO_TILE_HEIGHT / 2);
       ctx.closePath();
       ctx.fill();
 
-      ctx.strokeStyle = `#${Math.max(0, color - 0x111111).toString(16).padStart(6, "0")}`;
+      // Darker outline for sand/dirt – subtle shadow between tiles
+      const r = Math.max(0, ((color >> 16) & 0xff) - 28);
+      const g = Math.max(0, ((color >> 8) & 0xff) - 22);
+      const b = Math.max(0, (color & 0xff) - 18);
+      ctx.strokeStyle = `#${(r << 16 | g << 8 | b).toString(16).padStart(6, "0")}`;
       ctx.lineWidth = 1;
       ctx.stroke();
     }

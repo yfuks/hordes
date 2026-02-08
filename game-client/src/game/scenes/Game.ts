@@ -46,8 +46,8 @@ export class Game extends Scene {
    * - createBlankLayer with offset for centering
    */
   private createIsometricMap() {
-    const mapWidth = 12;
-    const mapHeight = 12;
+    const mapWidth = 480;
+    const mapHeight = 480;
 
     const mapData = new Phaser.Tilemaps.MapData({
       width: mapWidth,
@@ -76,8 +76,11 @@ export class Game extends Scene {
       return;
     }
 
-    const offsetX = 350;
-    const offsetY = 180;
+    // Center the map on screen (isometric: tile (cx,cy) at offset + (cx-cy)*tileW/2, offset + (cx+cy)*tileH/2)
+    const cx = mapWidth / 2;
+    const cy = mapHeight / 2;
+    const offsetX = this.cameras.main.width / 2 - (cx - cy) * (ISO_TILE_WIDTH / 2);
+    const offsetY = this.cameras.main.height / 2 - (cx + cy) * (ISO_TILE_HEIGHT / 2);
     this.isoLayer = map.createBlankLayer("ground", tileset, offsetX, offsetY)!;
 
     const groundData = this.generateGroundTiles(mapWidth, mapHeight);
@@ -87,6 +90,29 @@ export class Game extends Scene {
         this.isoLayer.putTileAt(index, x, y);
       }
     }
+
+    // Camera bounds so we can drag around the bigger map
+    const margin = 200;
+    const minX = offsetX - margin - (mapHeight - 0) * (ISO_TILE_WIDTH / 2);
+    const maxX = offsetX + margin + (mapWidth - 0) * (ISO_TILE_WIDTH / 2);
+    const minY = offsetY - margin;
+    const maxY = offsetY + margin + (mapWidth + mapHeight) * (ISO_TILE_HEIGHT / 2);
+    this.camera.setBounds(minX, minY, maxX - minX, maxY - minY);
+
+    let prevX = 0;
+    let prevY = 0;
+    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      prevX = p.x;
+      prevY = p.y;
+    });
+    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
+      if (p.isDown) {
+        this.camera.scrollX -= p.x - prevX;
+        this.camera.scrollY -= p.y - prevY;
+        prevX = p.x;
+        prevY = p.y;
+      }
+    });
   }
 
   private generateGroundTiles(width: number, height: number): number[][] {
