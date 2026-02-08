@@ -10,7 +10,7 @@ export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
   isoLayer!: Phaser.Tilemaps.TilemapLayer;
   msg_text!: Phaser.GameObjects.Text;
-  /** Placeholder character – zoom is centered on this position */
+  /** Placeholder character at map center */
   player!: Phaser.GameObjects.Container;
   roomId: string | null = null;
 
@@ -41,35 +41,9 @@ export class Game extends Scene {
       })
       .setOrigin(0.5);
 
-    this.setupZoom();
   }
 
-  private static readonly MIN_ZOOM = 0.25;
-  private static readonly MAX_ZOOM = 3;
-  private static readonly ZOOM_SENSITIVITY = 0.001;
-
-  private setupZoom() {
-    const canvas = this.sys.game.canvas;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const delta = -e.deltaY * Game.ZOOM_SENSITIVITY;
-      const newZoom = Phaser.Math.Clamp(
-        this.camera.zoom + delta * this.camera.zoom,
-        Game.MIN_ZOOM,
-        Game.MAX_ZOOM
-      );
-
-      this.camera.setZoom(newZoom);
-      // Keep zoom anchored on the character (Phaser handles scroll/origin correctly)
-      this.camera.centerOn(this.player.x, this.player.y);
-    };
-    canvas.addEventListener("wheel", onWheel, { passive: false });
-    this.events.once("shutdown", () =>
-      canvas.removeEventListener("wheel", onWheel)
-    );
-  }
-
-  /** Placeholder character at map center; zoom is anchored on this position. */
+  /** Placeholder character at map center. */
   private createPlaceholderCharacter() {
     const mapWidth = 480;
     const mapHeight = 480;
@@ -148,28 +122,6 @@ export class Game extends Scene {
       }
     }
 
-    // Camera bounds so we can drag around the bigger map
-    const margin = 200;
-    const minX = offsetX - margin - (mapHeight - 0) * (ISO_TILE_WIDTH / 2);
-    const maxX = offsetX + margin + (mapWidth - 0) * (ISO_TILE_WIDTH / 2);
-    const minY = offsetY - margin;
-    const maxY = offsetY + margin + (mapWidth + mapHeight) * (ISO_TILE_HEIGHT / 2);
-    this.camera.setBounds(minX, minY, maxX - minX, maxY - minY);
-
-    let prevX = 0;
-    let prevY = 0;
-    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      prevX = p.x;
-      prevY = p.y;
-    });
-    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
-      if (p.isDown) {
-        this.camera.scrollX -= p.x - prevX;
-        this.camera.scrollY -= p.y - prevY;
-        prevX = p.x;
-        prevY = p.y;
-      }
-    });
   }
 
   private generateGroundTiles(width: number, height: number): number[][] {
