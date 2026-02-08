@@ -18,7 +18,8 @@ export class Preloader extends Scene {
   preload() {
     this.load.setPath('assets');
     this.load.image('logo', 'logo.png');
-    // Shared assets for Game scene – loaded here per Phaser loader best practice
+    // Dirt/floor isometric tileset (8×4 tiles, 64×32 each); fallback: procedural in create()
+    this.load.image('iso-tiles', 'dirt-tileset.png');
   }
 
   create() {

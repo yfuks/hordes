@@ -30,11 +30,7 @@ export class Game extends Scene {
 
   create() {
     this.camera = this.cameras.main;
-    this.camera.setBackgroundColor(0x000000);
 
-    // Rounded circular view with soft blur at the border
-    this.camera.postFX.addCircle(0, 0x000000, 0x000000, 1, 0.04);
-    this.camera.postFX.addVignette(0.5, 0.5, 0.5, 0.5);
 
     this.createIsometricMap();
     this.createPlaceholderCharacter();
@@ -135,12 +131,48 @@ export class Game extends Scene {
 
   }
 
+  /** Grid step for value noise – larger = bigger patches of same tile. */
+  private static readonly GROUND_NOISE_SCALE = 14;
+  /** Number of tile variants in the tileset (0..TILE_VARIANTS-1). */
+  private static readonly TILE_VARIANTS = 16;
+
+  /** Seeded hash for deterministic noise; returns [0, 1). */
+  private static hash(n: number): number {
+    let h = (n >>> 0) * 2654435761;
+    return (h >>> 0) / 4294967296;
+  }
+
+  /** Value at integer grid point (ix, iy) for ground noise. */
+  private static noise2d(ix: number, iy: number): number {
+    return Game.hash(ix * 7919 + iy * 31);
+  }
+
+  /** Bilinear interpolation for smooth grouping of same-colored tiles. */
+  private static smoothNoise(x: number, y: number): number {
+    const scale = Game.GROUND_NOISE_SCALE;
+    const gx = x / scale;
+    const gy = y / scale;
+    const ix = Math.floor(gx);
+    const iy = Math.floor(gy);
+    const fx = gx - ix;
+    const fy = gy - iy;
+    const fx1 = 1 - fx;
+    const fy1 = 1 - fy;
+    const v00 = Game.noise2d(ix, iy);
+    const v10 = Game.noise2d(ix + 1, iy);
+    const v01 = Game.noise2d(ix, iy + 1);
+    const v11 = Game.noise2d(ix + 1, iy + 1);
+    return v00 * fx1 * fy1 + v10 * fx * fy1 + v01 * fx1 * fy + v11 * fx * fy;
+  }
+
   private generateGroundTiles(width: number, height: number): number[][] {
     const tiles: number[][] = [];
     for (let y = 0; y < height; y++) {
       const row: number[] = [];
       for (let x = 0; x < width; x++) {
-        row.push((x + y) % 16);
+        const t = Game.smoothNoise(x, y);
+        const index = Math.floor(t * Game.TILE_VARIANTS) % Game.TILE_VARIANTS;
+        row.push(index);
       }
       tiles.push(row);
     }
