@@ -10,6 +10,8 @@ export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
   isoLayer!: Phaser.Tilemaps.TilemapLayer;
   msg_text!: Phaser.GameObjects.Text;
+  /** Placeholder character – zoom is centered on this position */
+  player!: Phaser.GameObjects.Container;
   roomId: string | null = null;
 
   constructor() {
@@ -25,6 +27,7 @@ export class Game extends Scene {
     this.camera.setBackgroundColor(0x1a1a2e);
 
     this.createIsometricMap();
+    this.createPlaceholderCharacter();
 
     const roomLabel = this.roomId ? `Room: ${this.roomId}` : "No room";
     this.msg_text = this.add
@@ -49,10 +52,6 @@ export class Game extends Scene {
     const canvas = this.sys.game.canvas;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const pointer = this.input.activePointer;
-      const worldX = this.camera.scrollX + pointer.x / this.camera.zoom;
-      const worldY = this.camera.scrollY + pointer.y / this.camera.zoom;
-
       const delta = -e.deltaY * Game.ZOOM_SENSITIVITY;
       const newZoom = Phaser.Math.Clamp(
         this.camera.zoom + delta * this.camera.zoom,
@@ -61,15 +60,40 @@ export class Game extends Scene {
       );
 
       this.camera.setZoom(newZoom);
-      this.camera.setScroll(
-        worldX - pointer.x / newZoom,
-        worldY - pointer.y / newZoom
-      );
+      // Keep zoom anchored on the character (Phaser handles scroll/origin correctly)
+      this.camera.centerOn(this.player.x, this.player.y);
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
     this.events.once("shutdown", () =>
       canvas.removeEventListener("wheel", onWheel)
     );
+  }
+
+  /** Placeholder character at map center; zoom is anchored on this position. */
+  private createPlaceholderCharacter() {
+    const mapWidth = 480;
+    const mapHeight = 480;
+    const cx = mapWidth / 2;
+    const cy = mapHeight / 2;
+    const worldX =
+      this.cameras.main.width / 2 -
+      (mapWidth / 2 - mapHeight / 2) * (ISO_TILE_WIDTH / 2) +
+      (cx - cy) * (ISO_TILE_WIDTH / 2);
+    const worldY =
+      this.cameras.main.height / 2 -
+      (mapWidth / 2 + mapHeight / 2) * (ISO_TILE_HEIGHT / 2) +
+      (cx + cy) * (ISO_TILE_HEIGHT / 2);
+
+    const body = this.add.circle(0, 0, 14, 0x4a9eff);
+    body.setStrokeStyle(2, 0x2d6cb5);
+    const head = this.add.circle(0, -22, 8, 0xffd4a3);
+    head.setStrokeStyle(1, 0xc4956a);
+
+    this.player = this.add.container(worldX, worldY, [body, head]);
+    this.player.setDepth(worldY);
+
+    // Start with camera centered on character
+    this.camera.centerOn(worldX, worldY);
   }
 
   /**
