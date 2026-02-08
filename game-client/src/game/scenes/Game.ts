@@ -187,6 +187,15 @@ export class Game extends Scene {
       onUpdate: () => this.player.setDepth(this.player.y),
       onComplete: () => {
         this.moveTween = null;
+        // Clear highlight when player arrives on the highlighted tile
+        if (
+          this.highlightedTile &&
+          this.highlightedTile.x === tileX &&
+          this.highlightedTile.y === tileY
+        ) {
+          this.highlightedTile = null;
+          this.drawHighlight();
+        }
       },
     });
   }
