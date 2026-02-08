@@ -30,7 +30,11 @@ export class Game extends Scene {
 
   create() {
     this.camera = this.cameras.main;
-    this.camera.setBackgroundColor(0x1a1a2e);
+    this.camera.setBackgroundColor(0x000000);
+
+    // Rounded circular view with soft blur at the border
+    this.camera.postFX.addCircle(0, 0x000000, 0x000000, 1, 0.04);
+    this.camera.postFX.addVignette(0.5, 0.5, 0.5, 0.5);
 
     this.createIsometricMap();
     this.createPlaceholderCharacter();
