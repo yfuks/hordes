@@ -1,5 +1,5 @@
 import { Scene } from 'phaser';
-import { createIsoTilesetTexture } from '../assets/isoTileset';
+import { createTilesetTexture } from '../assets/tileset';
 
 export class Preloader extends Scene {
   constructor() {
@@ -18,12 +18,12 @@ export class Preloader extends Scene {
   preload() {
     this.load.setPath('assets');
     this.load.image('logo', 'logo.png');
-    // Dirt/floor isometric tileset (8×4 tiles, 64×32 each); fallback: procedural in create()
-    this.load.image('iso-tiles', 'dirt-tileset.png');
+    // Dirt/floor top-down tileset (8×8 tiles, 32×32 each); fallback: procedural in create()
+    this.load.image('ground-tiles', 'dirt-tileset.png');
   }
 
   create() {
-    createIsoTilesetTexture(this.textures);
+    createTilesetTexture(this.textures);
     this.scene.start('MainMenu');
   }
 }

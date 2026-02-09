@@ -18,7 +18,7 @@ A **2D multiplayer zombie survival game** playable directly in the browser.
 * Before entering a game, players can change or set their character's appearance, selecting from available customizations. The character's appearance choice is saved for the user (per browser and/or account) so it is automatically restored for future sessions.
 * When a player performs an action that has potential positive or negative consequences, the outcome is determined randomly—but is also influenced by the player's relevant stats
 * Every **10 minutes**, a **zombie horde attacks** the city. The wave size increases each time.
-* Isometric view, tilemap-based
+* Top-down view, tilemap-based
 * Pixel art using PNG assets
 * **Server-authoritative architecture** (anti-cheat)
 

@@ -1,14 +1,14 @@
 import { Scene } from "phaser";
-import { ISO_TILE_HEIGHT, ISO_TILE_WIDTH } from "../assets/isoTileset";
+import { TILE_SIZE } from "../assets/tileset";
 
 export interface GameSceneData {
   roomId?: string;
 }
 
-/** Game scene – isometric view, tilemap-based (per AGENTS.md) */
+/** Game scene – top-down view, tilemap-based (per AGENTS.md) */
 export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
-  isoLayer!: Phaser.Tilemaps.TilemapLayer;
+  groundLayer!: Phaser.Tilemaps.TilemapLayer;
   msg_text!: Phaser.GameObjects.Text;
   /** Placeholder character at map center */
   player!: Phaser.GameObjects.Container;
@@ -31,14 +31,13 @@ export class Game extends Scene {
   create() {
     this.camera = this.cameras.main;
 
-
-    this.createIsometricMap();
+    this.createTopDownMap();
     this.createPlaceholderCharacter();
     this.setupTileHighlight();
 
     const roomLabel = this.roomId ? `Room: ${this.roomId}` : "No room";
     this.msg_text = this.add
-      .text(512, 40, `${roomLabel} – Isometric view`, {
+      .text(512, 40, `${roomLabel} – Top-down view`, {
         fontFamily: "Arial Black",
         fontSize: 20,
         color: "#ffffff",
@@ -47,7 +46,6 @@ export class Game extends Scene {
         align: "center",
       })
       .setOrigin(0.5);
-
   }
 
   /** Placeholder character at map center. */
@@ -56,14 +54,10 @@ export class Game extends Scene {
     const mapHeight = 480;
     const cx = mapWidth / 2;
     const cy = mapHeight / 2;
-    const worldX =
-      this.cameras.main.width / 2 -
-      (mapWidth / 2 - mapHeight / 2) * (ISO_TILE_WIDTH / 2) +
-      (cx - cy) * (ISO_TILE_WIDTH / 2);
-    const worldY =
-      this.cameras.main.height / 2 -
-      (mapWidth / 2 + mapHeight / 2) * (ISO_TILE_HEIGHT / 2) +
-      (cx + cy) * (ISO_TILE_HEIGHT / 2);
+    const offsetX = this.cameras.main.width / 2 - cx * TILE_SIZE - TILE_SIZE / 2;
+    const offsetY = this.cameras.main.height / 2 - cy * TILE_SIZE - TILE_SIZE / 2;
+    const worldX = offsetX + cx * TILE_SIZE + TILE_SIZE / 2;
+    const worldY = offsetY + cy * TILE_SIZE + TILE_SIZE / 2;
 
     const body = this.add.circle(0, 0, 14, 0x4a9eff);
     body.setStrokeStyle(2, 0x2d6cb5);
@@ -77,34 +71,32 @@ export class Game extends Scene {
   }
 
   /**
-   * Creates isometric tilemap per Phaser docs:
-   * - Orientation.ISOMETRIC, 64x32 grid (2:1 ratio)
-   * - addTilesetImage with texture key and tile dimensions
-   * - createBlankLayer with offset for centering
+   * Creates top-down (orthogonal) tilemap per Phaser docs.
+   * Orientation.ORTHOGONAL with square tiles – standard 2D grid.
    */
-  private createIsometricMap() {
+  private createTopDownMap() {
     const mapWidth = 480;
     const mapHeight = 480;
 
     const mapData = new Phaser.Tilemaps.MapData({
       width: mapWidth,
       height: mapHeight,
-      tileWidth: ISO_TILE_WIDTH,
-      tileHeight: ISO_TILE_HEIGHT,
-      orientation: Phaser.Tilemaps.Orientation.ISOMETRIC,
+      tileWidth: TILE_SIZE,
+      tileHeight: TILE_SIZE,
+      orientation: Phaser.Tilemaps.Orientation.ORTHOGONAL,
       format: Phaser.Tilemaps.Formats.ARRAY_2D,
     });
 
     const map = new Phaser.Tilemaps.Tilemap(this, mapData);
     const tileset = map.addTilesetImage(
-      "iso-tiles",
-      "iso-tiles",
-      ISO_TILE_WIDTH,
-      ISO_TILE_HEIGHT
+      "ground-tiles",
+      "ground-tiles",
+      TILE_SIZE,
+      TILE_SIZE
     );
 
     if (!tileset) {
-      console.error("iso-tiles texture missing – ensure Preloader created it");
+      console.error("ground-tiles texture missing – ensure Preloader created it");
       this.add.text(512, 384, "Tileset not loaded", {
         fontFamily: "Arial",
         fontSize: 24,
@@ -113,22 +105,18 @@ export class Game extends Scene {
       return;
     }
 
-    // Center the map on screen (isometric: tile (cx,cy) at offset + (cx-cy)*tileW/2, offset + (cx+cy)*tileH/2)
-    const cx = mapWidth / 2;
-    const cy = mapHeight / 2;
-    const offsetX = this.cameras.main.width / 2 - (cx - cy) * (ISO_TILE_WIDTH / 2);
-    const offsetY = this.cameras.main.height / 2 - (cx + cy) * (ISO_TILE_HEIGHT / 2);
-    this.isoLayer = map.createBlankLayer("ground", tileset, offsetX, offsetY)!;
-    this.isoLayer.setDepth(Number.MAX_SAFE_INTEGER * -1); // Ground behind entities so player stays visible
+    const offsetX = this.cameras.main.width / 2 - (mapWidth / 2) * TILE_SIZE - TILE_SIZE / 2;
+    const offsetY = this.cameras.main.height / 2 - (mapHeight / 2) * TILE_SIZE - TILE_SIZE / 2;
+    this.groundLayer = map.createBlankLayer("ground", tileset, offsetX, offsetY)!;
+    this.groundLayer.setDepth(Number.MAX_SAFE_INTEGER * -1);
 
     const groundData = this.generateGroundTiles(mapWidth, mapHeight);
     for (let y = 0; y < mapHeight; y++) {
       for (let x = 0; x < mapWidth; x++) {
         const index = groundData[y][x];
-        this.isoLayer.putTileAt(index, x, y);
+        this.groundLayer.putTileAt(index, x, y);
       }
     }
-
   }
 
   /** Grid step for value noise – larger = bigger patches of same tile. */
@@ -185,9 +173,9 @@ export class Game extends Scene {
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       const worldX = pointer.worldX;
       const worldY = pointer.worldY;
-      const tileXY = this.isoLayer.worldToTileXY(worldX, worldY, true);
-      const tileX = Math.round(tileXY.x);
-      const tileY = Math.round(tileXY.y);
+      const tileXY = this.groundLayer.worldToTileXY(worldX, worldY, true);
+      const tileX = Math.floor(tileXY.x);
+      const tileY = Math.floor(tileXY.y);
 
       const mapWidth = 480;
       const mapHeight = 480;
@@ -208,7 +196,7 @@ export class Game extends Scene {
     if (distance < 1) return;
 
     if (this.moveTween) this.moveTween.stop();
-    const duration = (distance / Game.PLAYER_SPEED) * 1000; // ms
+    const duration = (distance / Game.PLAYER_SPEED) * 1000;
 
     this.moveTween = this.tweens.add({
       targets: this.player,
@@ -219,7 +207,6 @@ export class Game extends Scene {
       onUpdate: () => this.player.setDepth(this.player.y),
       onComplete: () => {
         this.moveTween = null;
-        // Clear highlight when player arrives on the highlighted tile
         if (
           this.highlightedTile &&
           this.highlightedTile.x === tileX &&
@@ -232,12 +219,12 @@ export class Game extends Scene {
     });
   }
 
-  /** World position of the center of a tile (same as highlight drawing). */
+  /** World position of the center of a tile (top-down: tile origin + half size). */
   private getTileCenterWorldXY(tileX: number, tileY: number): { x: number; y: number } {
-    const worldXY = this.isoLayer.tileToWorldXY(tileX, tileY);
+    const worldXY = this.groundLayer.tileToWorldXY(tileX, tileY);
     return {
-      x: worldXY.x + ISO_TILE_WIDTH / 2,
-      y: worldXY.y + ISO_TILE_HEIGHT,
+      x: worldXY.x + TILE_SIZE / 2,
+      y: worldXY.y + TILE_SIZE / 2,
     };
   }
 
@@ -246,17 +233,11 @@ export class Game extends Scene {
     if (!this.highlightedTile) return;
 
     const { x: tileX, y: tileY } = this.highlightedTile;
-    const { x: cx, y: cy } = this.getTileCenterWorldXY(tileX, tileY);
+    const worldXY = this.groundLayer.tileToWorldXY(tileX, tileY);
 
     this.highlightGraphics.fillStyle(0x4a9eff, 0.35);
     this.highlightGraphics.lineStyle(2, 0x4a9eff, 0.9);
-    this.highlightGraphics.beginPath();
-    this.highlightGraphics.moveTo(cx, cy - ISO_TILE_HEIGHT / 2);
-    this.highlightGraphics.lineTo(cx + ISO_TILE_WIDTH / 2, cy);
-    this.highlightGraphics.lineTo(cx, cy + ISO_TILE_HEIGHT / 2);
-    this.highlightGraphics.lineTo(cx - ISO_TILE_WIDTH / 2, cy);
-    this.highlightGraphics.closePath();
-    this.highlightGraphics.fillPath();
-    this.highlightGraphics.strokePath();
+    this.highlightGraphics.strokeRect(worldXY.x, worldXY.y, TILE_SIZE, TILE_SIZE);
+    this.highlightGraphics.fillRect(worldXY.x, worldXY.y, TILE_SIZE, TILE_SIZE);
   }
 }
