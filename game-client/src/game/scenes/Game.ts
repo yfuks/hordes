@@ -1,9 +1,12 @@
 import { Scene } from "phaser";
-import { TILE_SIZE } from "../assets/tileset";
+import { TILE_SIZE, GROUND_TILESET_TILE_COUNT } from "../assets/tileset";
 
 export interface GameSceneData {
   roomId?: string;
 }
+
+/** Character facing direction for idle/special. */
+type CharacterDirection = "down" | "up" | "side";
 
 /** Game scene – top-down view, tilemap-based (per AGENTS.md) */
 export class Game extends Scene {
@@ -17,8 +20,19 @@ export class Game extends Scene {
   private highlightedTile: { x: number; y: number } | null = null;
   private highlightGraphics!: Phaser.GameObjects.Graphics;
   /** Movement speed in world pixels per second */
-  private static readonly PLAYER_SPEED = 180;
+  private static readonly PLAYER_SPEED = 80;
   private moveTween: Phaser.Tweens.Tween | null = null;
+  /** Last movement direction for idle/special. */
+  private lastDirection: CharacterDirection = "down";
+  /** When direction is side, true = right, false = left. */
+  private facingRight = false;
+  /** Whether special is currently playing. */
+  private isPlayingSpecial = false;
+  /** Timer for triggering special after long idle; reset when player moves. */
+  private idleSpecialTimer: Phaser.Time.TimerEvent | null = null;
+  /** Idle delay range (ms) before special can trigger. */
+  private static readonly IDLE_SPECIAL_MIN_MS = 4000;
+  private static readonly IDLE_SPECIAL_MAX_MS = 8000;
 
   constructor() {
     super("Game");
@@ -31,9 +45,11 @@ export class Game extends Scene {
   create() {
     this.camera = this.cameras.main;
 
+    this.createCharacterAnimations();
     this.createTopDownMap();
     this.createPlaceholderCharacter();
     this.setupTileHighlight();
+    this.startIdleSpecialTimer();
 
     const roomLabel = this.roomId ? `Room: ${this.roomId}` : "No room";
     this.msg_text = this.add
@@ -48,7 +64,46 @@ export class Game extends Scene {
       .setOrigin(0.5);
   }
 
-  /** Placeholder character at map center. */
+  private createCharacterAnimations() {
+    const walkRate = 8;
+    const idleRate = 6;
+    const specialRate = 10;
+    const atlas = "character";
+
+    const dirs = [
+      { key: "D", name: "down" },
+      { key: "U", name: "up" },
+      { key: "S", name: "side" },
+    ] as const;
+    for (const { key, name } of dirs) {
+      if (!this.anims.exists(`idle-${name}`)) {
+        this.anims.create({
+          key: `idle-${name}`,
+          frames: this.anims.generateFrameNames(atlas, { prefix: `${key}_Idle_`, start: 0, end: 3 }),
+          frameRate: idleRate,
+          repeat: -1,
+        });
+      }
+      if (!this.anims.exists(`walk-${name}`)) {
+        this.anims.create({
+          key: `walk-${name}`,
+          frames: this.anims.generateFrameNames(atlas, { prefix: `${key}_Walk_`, start: 0, end: 5 }),
+          frameRate: walkRate,
+          repeat: -1,
+        });
+      }
+      if (!this.anims.exists(`special-${name}`)) {
+        this.anims.create({
+          key: `special-${name}`,
+          frames: this.anims.generateFrameNames(atlas, { prefix: `${key}_Special_`, start: 0, end: 5 }),
+          frameRate: specialRate,
+          repeat: 0,
+        });
+      }
+    }
+  }
+
+  /** Placeholder character at map center (Craftpix pixel citizen sprite). */
   private createPlaceholderCharacter() {
     const mapWidth = 480;
     const mapHeight = 480;
@@ -59,15 +114,55 @@ export class Game extends Scene {
     const worldX = offsetX + cx * TILE_SIZE + TILE_SIZE / 2;
     const worldY = offsetY + cy * TILE_SIZE + TILE_SIZE / 2;
 
-    const body = this.add.circle(0, 0, 14, 0x4a9eff);
-    body.setStrokeStyle(2, 0x2d6cb5);
-    const head = this.add.circle(0, -22, 8, 0xffd4a3);
-    head.setStrokeStyle(1, 0xc4956a);
+    const sprite = this.add.sprite(0, 0, "character", "D_Idle_0");
+    sprite.setOrigin(0.5, 1);
 
-    this.player = this.add.container(worldX, worldY, [body, head]);
+    this.player = this.add.container(worldX, worldY, [sprite]);
     this.player.setDepth(worldY);
 
     this.camera.startFollow(this.player);
+  }
+
+  /** Play idle animation in current direction. */
+  private playIdle() {
+    const sprite = this.player.list[0] as Phaser.GameObjects.Sprite;
+    if (!sprite?.play) return;
+    sprite.setFlipX(this.lastDirection === "side" && this.facingRight);
+    sprite.play(`idle-${this.lastDirection}`);
+  }
+
+  /** Schedule a random delay; when it fires, play special once then reschedule. */
+  private startIdleSpecialTimer() {
+    if (this.idleSpecialTimer) return;
+    const delay =
+      Game.IDLE_SPECIAL_MIN_MS +
+      Math.random() * (Game.IDLE_SPECIAL_MAX_MS - Game.IDLE_SPECIAL_MIN_MS);
+    this.idleSpecialTimer = this.time.delayedCall(delay, () => {
+      this.idleSpecialTimer = null;
+      this.playSpecial();
+    });
+  }
+
+  private stopIdleSpecialTimer() {
+    if (this.idleSpecialTimer) {
+      this.idleSpecialTimer.destroy();
+      this.idleSpecialTimer = null;
+    }
+  }
+
+  /** Play special once; on complete return to idle and schedule next idle special. */
+  private playSpecial() {
+    if (this.isPlayingSpecial) return;
+    const sprite = this.player.list[0] as Phaser.GameObjects.Sprite;
+    if (!sprite?.play) return;
+    this.isPlayingSpecial = true;
+    sprite.setFlipX(this.lastDirection === "side" && this.facingRight);
+    sprite.play(`special-${this.lastDirection}`);
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      this.isPlayingSpecial = false;
+      this.playIdle();
+      this.startIdleSpecialTimer();
+    });
   }
 
   /**
@@ -96,7 +191,7 @@ export class Game extends Scene {
     );
 
     if (!tileset) {
-      console.error("ground-tiles texture missing – ensure Preloader created it");
+      console.error("ground-tiles texture missing – ensure Preloader loaded it");
       this.add.text(512, 384, "Tileset not loaded", {
         fontFamily: "Arial",
         fontSize: 24,
@@ -121,8 +216,8 @@ export class Game extends Scene {
 
   /** Grid step for value noise – larger = bigger patches of same tile. */
   private static readonly GROUND_NOISE_SCALE = 14;
-  /** Number of tile variants in the tileset (0..TILE_VARIANTS-1). */
-  private static readonly TILE_VARIANTS = 16;
+  /** Number of tile variants in the ground tileset (0..TILE_VARIANTS-1). */
+  private static readonly TILE_VARIANTS = GROUND_TILESET_TILE_COUNT;
 
   /** Seeded hash for deterministic noise; returns [0, 1). */
   private static hash(n: number): number {
@@ -195,8 +290,27 @@ export class Game extends Scene {
     const distance = Math.sqrt(dx * dx + dy * dy);
     if (distance < 1) return;
 
+    this.stopIdleSpecialTimer();
     if (this.moveTween) this.moveTween.stop();
     const duration = (distance / Game.PLAYER_SPEED) * 1000;
+
+    const isHorizontal = Math.abs(dx) > Math.abs(dy);
+    if (isHorizontal) {
+      this.lastDirection = "side";
+      this.facingRight = dx > 0;
+    } else if (dy < 0) {
+      this.lastDirection = "up";
+      this.facingRight = false;
+    } else {
+      this.lastDirection = "down";
+      this.facingRight = false;
+    }
+
+    const sprite = this.player.list[0] as Phaser.GameObjects.Sprite;
+    if (sprite && sprite.play) {
+      sprite.setFlipX(this.lastDirection === "side" && this.facingRight);
+      sprite.play(`walk-${this.lastDirection}`);
+    }
 
     this.moveTween = this.tweens.add({
       targets: this.player,
@@ -207,6 +321,8 @@ export class Game extends Scene {
       onUpdate: () => this.player.setDepth(this.player.y),
       onComplete: () => {
         this.moveTween = null;
+        this.playIdle();
+        this.startIdleSpecialTimer();
         if (
           this.highlightedTile &&
           this.highlightedTile.x === tileX &&

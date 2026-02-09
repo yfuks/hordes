@@ -1,5 +1,4 @@
 import { Scene } from 'phaser';
-import { createTilesetTexture } from '../assets/tileset';
 
 export class Preloader extends Scene {
   constructor() {
@@ -18,12 +17,14 @@ export class Preloader extends Scene {
   preload() {
     this.load.setPath('assets');
     this.load.image('logo', 'logo.png');
-    // Dirt/floor top-down tileset (8×8 tiles, 32×32 each); fallback: procedural in create()
-    this.load.image('ground-tiles', 'dirt-tileset.png');
+    // Ground tilesets from Craftpix village pack (8×8 tiles, 32×32 each)
+    this.load.image('ground-tiles', 'ground-tiles.png');
+    this.load.image('ground-tiles-2', 'ground-tiles-2.png');
+    // Single character atlas: D/U/S × Idle/Walk/Special (Craftpix pixel citizens)
+    this.load.atlas('character', 'character-atlas.png', 'character-atlas.json');
   }
 
   create() {
-    createTilesetTexture(this.textures);
     this.scene.start('MainMenu');
   }
 }
