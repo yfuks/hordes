@@ -1,6 +1,6 @@
 import { Scene } from "phaser";
 import { getRoomIdFromPage } from "../config";
-import { type MapData } from "../network/roomClient";
+import { getMapData, getMapDataOnce, type MapData } from "../network/roomClient";
 import { registerCharacterAnimations } from "../animations/characterAnimations";
 import { createGameMap } from "../map/gameMap";
 import { createPlayerController } from "../player/playerController";
@@ -39,20 +39,49 @@ export class Game extends Scene {
 
     registerCharacterAnimations(this);
 
-    let groundLayer: Phaser.Tilemaps.TilemapLayer;
-    let scheduleApplyServerMapWhenReady: () => void;
+    if (!this.roomId) {
+      this.add
+        .text(512, 384, "Join a room from the main menu", {
+          fontFamily: "Arial",
+          fontSize: 24,
+          color: "#ffffff",
+        })
+        .setOrigin(0.5);
+      return;
+    }
 
-    try {
-      const mapResult = createGameMap({
-        scene: this,
-        mapData: this.mapData,
-        roomId: this.roomId,
-      });
-      groundLayer = mapResult.groundLayer;
-      scheduleApplyServerMapWhenReady = mapResult.scheduleApplyServerMapWhenReady;
-      if (mapResult.usedLocalFallback && this.roomId && this.roomId !== "offline") {
-        scheduleApplyServerMapWhenReady();
+    const mapData = this.mapData ?? getMapData();
+    if (mapData) {
+      this.createMapAndPlayer(mapData);
+      return;
+    }
+
+    const loadingText = this.add
+      .text(512, 384, "Generating map…", {
+        fontFamily: "Arial",
+        fontSize: 24,
+        color: "#ffffff",
+      })
+      .setOrigin(0.5)
+      .setName("loading-map");
+
+    getMapDataOnce().then(
+      (data) => {
+        if (!this.scene.isActive("Game")) return;
+        loadingText.destroy();
+        this.createMapAndPlayer(data);
+      },
+      () => {
+        if (!this.scene.isActive("Game")) return;
+        loadingText.setText("Failed to load map");
       }
+    );
+  }
+
+  private createMapAndPlayer(mapData: MapData) {
+    let groundLayer: Phaser.Tilemaps.TilemapLayer;
+    try {
+      groundLayer = createGameMap({ scene: this, mapData });
     } catch (err) {
       this.add
         .text(512, 384, "Tileset not loaded", {

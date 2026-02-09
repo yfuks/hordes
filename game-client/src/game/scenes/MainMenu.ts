@@ -8,7 +8,6 @@ export class MainMenu extends Scene {
   logo!: GameObjects.Image;
   roomInput!: HTMLInputElement;
   statusText!: GameObjects.Text;
-  private offlineBtn?: HTMLButtonElement;
 
   constructor() {
     super("MainMenu");
@@ -22,12 +21,8 @@ export class MainMenu extends Scene {
       .text(512, 670, "", textStyles.status)
       .setOrigin(0.5);
 
-    // Always add "Play offline" so user can escape if stuck
-    this.addPlayOfflineButton();
-
     this.events.on("shutdown", () => {
       this.roomInput?.parentNode?.removeChild(this.roomInput);
-      this.offlineBtn?.remove();
     });
 
     const roomId = getRoomIdFromPage();
@@ -83,19 +78,6 @@ export class MainMenu extends Scene {
       .on("pointerout", () => createRoomBtn.setStyle(textStyles.button));
 
     createRoomBtn.on("pointerdown", () => this.onCreateRoom());
-  }
-
-  private addPlayOfflineButton() {
-    const btn = document.createElement("button");
-    btn.textContent = "Play offline";
-    btn.className = "hordes-btn";
-    btn.style.cssText = `
-      position: absolute; top: 16px; right: 16px; z-index: 10;
-      cursor: pointer;
-    `;
-    btn.onclick = () => this.scene.start("Game", { roomId: "offline" });
-    this.offlineBtn = btn;
-    this.scale.parent?.appendChild(btn);
   }
 
   private setStatus(msg: string, isError = false) {

@@ -8,6 +8,8 @@ let client: Client | null = null;
 let currentRoom: Room | null = null;
 /** Map received via "map" message (best practice: not in state). Cleared when leaving room. */
 let currentMapData: MapData | null = null;
+let mapDataPromise: Promise<MapData> | null = null;
+let mapDataResolve: ((data: MapData) => void) | null = null;
 
 function getClient(): Client {
   if (!client) client = new Client(getServerUrl());
@@ -41,11 +43,18 @@ function getRoomId(room: Room): string {
 
 function registerMapMessageListener(room: Room) {
   currentMapData = null;
+  mapDataPromise = null;
+  mapDataResolve = null;
   room.onMessage("map", (data: MapData) => {
     if (data && typeof data.mapWidth === "number" && typeof data.mapHeight === "number" && Array.isArray(data.groundTiles)) {
       const expected = data.mapWidth * data.mapHeight;
       if (data.groundTiles.length === expected) {
-        currentMapData = { mapWidth: data.mapWidth, mapHeight: data.mapHeight, groundTiles: data.groundTiles };
+        const mapData = { mapWidth: data.mapWidth, mapHeight: data.mapHeight, groundTiles: data.groundTiles };
+        currentMapData = mapData;
+        if (mapDataResolve) {
+          mapDataResolve(mapData);
+          mapDataResolve = null;
+        }
       }
     }
   });
@@ -99,7 +108,18 @@ export function getCurrentRoom(): Room | null {
   return currentRoom;
 }
 
-/** Get server-generated map data (from "map" message). Undefined until message received or if offline. */
+/** Get server-generated map data (from "map" message). Undefined until message received. */
 export function getMapData(): MapData | undefined {
   return currentMapData ?? undefined;
+}
+
+/** Resolves with server map data when received (or immediately if already available). */
+export function getMapDataOnce(): Promise<MapData> {
+  if (currentMapData) return Promise.resolve(currentMapData);
+  if (!mapDataPromise) {
+    mapDataPromise = new Promise<MapData>((resolve) => {
+      mapDataResolve = resolve;
+    });
+  }
+  return mapDataPromise;
 }
