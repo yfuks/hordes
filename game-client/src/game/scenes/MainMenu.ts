@@ -118,8 +118,8 @@ export class MainMenu extends Scene {
   private async goToRoom(roomId: string) {
     this.setStatus("Joining room…");
     try {
-      await joinRoom(roomId);
-      this.scene.start("Game", { roomId });
+      const result = await joinRoom(roomId);
+      this.scene.start("Game", { roomId: result.roomId });
     } catch (e) {
       clearStoredRoomId();
       const msg = e instanceof Error ? e.message : String(e);
@@ -136,8 +136,8 @@ export class MainMenu extends Scene {
     }
     this.setStatus("Joining…");
     try {
-      await joinRoom(id);
-      this.scene.start("Game", { roomId: id });
+      const result = await joinRoom(id);
+      this.scene.start("Game", { roomId: result.roomId });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.setStatus(msg || "Room not found or full. Try another ID or create a room.", true);
@@ -147,8 +147,8 @@ export class MainMenu extends Scene {
   private async onCreateRoom() {
     this.setStatus("Creating room…");
     try {
-      const { roomId } = await createRoom();
-      this.scene.start("Game", { roomId });
+      const result = await createRoom();
+      this.scene.start("Game", { roomId: result.roomId });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.setStatus(msg || "Could not create room. Is the server running?", true);

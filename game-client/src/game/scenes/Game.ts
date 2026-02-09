@@ -1,8 +1,12 @@
 import { Scene } from "phaser";
 import { TILE_SIZE, GROUND_TILESET_TILE_COUNT } from "../assets/tileset";
+import { getRoomIdFromPage } from "../config";
+import { getCurrentRoom, getMapData, type MapData } from "../network/roomClient";
 
 export interface GameSceneData {
   roomId?: string;
+  /** Server map (passed when MainMenu waited for it); avoids timing issues. */
+  mapData?: MapData;
 }
 
 /** Character facing direction for idle/special. */
@@ -16,6 +20,8 @@ export class Game extends Scene {
   /** Placeholder character at map center */
   player!: Phaser.GameObjects.Container;
   roomId: string | null = null;
+  /** Server map when passed from MainMenu (so we don't rely on state timing). */
+  private mapData: MapData | null = null;
   /** Currently highlighted tile (tile coords); null when none */
   private highlightedTile: { x: number; y: number } | null = null;
   private highlightGraphics!: Phaser.GameObjects.Graphics;
@@ -39,11 +45,15 @@ export class Game extends Scene {
   }
 
   init(data: GameSceneData) {
-    this.roomId = data?.roomId ?? null;
+    // Prefer scene data; fallback to stored/URL room ID (set when we create/join)
+    const raw = data?.roomId ?? getRoomIdFromPage();
+    this.roomId = raw != null && raw !== "" && String(raw) !== "undefined" ? String(raw) : null;
+    this.mapData = data?.mapData ?? null;
   }
 
   create() {
     this.camera = this.cameras.main;
+    this.input.enabled = true;
 
     this.createCharacterAnimations();
     this.createTopDownMap();
@@ -51,7 +61,7 @@ export class Game extends Scene {
     this.setupTileHighlight();
     this.startIdleSpecialTimer();
 
-    const roomLabel = this.roomId ? `Room: ${this.roomId}` : "No room";
+    const roomLabel = this.roomId != null && this.roomId !== "" ? `Room: ${this.roomId}` : "No room";
     this.msg_text = this.add
       .text(512, 40, `${roomLabel} – Top-down view`, {
         fontFamily: "Arial Black",
@@ -105,8 +115,8 @@ export class Game extends Scene {
 
   /** Placeholder character at map center (Craftpix pixel citizen sprite). */
   private createPlaceholderCharacter() {
-    const mapWidth = 480;
-    const mapHeight = 480;
+    const mapWidth = this.groundLayer.width;
+    const mapHeight = this.groundLayer.height;
     const cx = mapWidth / 2;
     const cy = mapHeight / 2;
     const offsetX = this.cameras.main.width / 2 - cx * TILE_SIZE - TILE_SIZE / 2;
@@ -167,11 +177,15 @@ export class Game extends Scene {
 
   /**
    * Creates top-down (orthogonal) tilemap per Phaser docs.
-   * Orientation.ORTHOGONAL with square tiles – standard 2D grid.
+   * Uses server-generated map when joined to a room, else local fallback (e.g. offline).
    */
   private createTopDownMap() {
-    const mapWidth = 480;
-    const mapHeight = 480;
+    // Use map passed from MainMenu first (waited for state), then getMapData(), then local
+    const serverMap =
+      this.mapData ??
+      (this.roomId && this.roomId !== "offline" ? getMapData() : undefined);
+    const mapWidth = serverMap?.mapWidth ?? 480;
+    const mapHeight = serverMap?.mapHeight ?? 480;
 
     const mapData = new Phaser.Tilemaps.MapData({
       width: mapWidth,
@@ -205,13 +219,51 @@ export class Game extends Scene {
     this.groundLayer = map.createBlankLayer("ground", tileset, offsetX, offsetY)!;
     this.groundLayer.setDepth(Number.MAX_SAFE_INTEGER * -1);
 
-    const groundData = this.generateGroundTiles(mapWidth, mapHeight);
-    for (let y = 0; y < mapHeight; y++) {
-      for (let x = 0; x < mapWidth; x++) {
-        const index = groundData[y][x];
-        this.groundLayer.putTileAt(index, x, y);
+    if (serverMap?.groundTiles.length === mapWidth * mapHeight) {
+      const tiles = serverMap.groundTiles;
+      for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
+          const index = tiles[y * mapWidth + x];
+          this.groundLayer.putTileAt(index, x, y);
+        }
+      }
+    } else {
+      const groundData = this.generateGroundTiles(mapWidth, mapHeight);
+      for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
+          this.groundLayer.putTileAt(groundData[y][x], x, y);
+        }
+      }
+      // State may arrive after join; apply server map when it's ready
+      if (this.roomId && this.roomId !== "offline") {
+        this.scheduleApplyServerMapWhenReady();
       }
     }
+  }
+
+  /** When we used local map but are in a room, apply server map once state is available. */
+  private scheduleApplyServerMapWhenReady() {
+    const tryApply = () => {
+      const data = getMapData();
+      if (!data || !this.groundLayer) return;
+      const { mapWidth, mapHeight, groundTiles } = data;
+      if (mapWidth !== this.groundLayer.width || mapHeight !== this.groundLayer.height) return;
+      if (groundTiles.length !== mapWidth * mapHeight) return;
+      for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
+          this.groundLayer.putTileAt(groundTiles[y * mapWidth + x], x, y);
+        }
+      }
+    };
+    tryApply();
+    const room = getCurrentRoom();
+    if (room?.onStateChange?.once) {
+      room.onStateChange.once(() => tryApply());
+    }
+    this.time.delayedCall(150, tryApply);
+    this.time.delayedCall(500, tryApply);
+    this.time.delayedCall(1500, tryApply);
+    this.time.delayedCall(2500, tryApply);
   }
 
   /** Grid step for value noise – larger = bigger patches of same tile. */
@@ -266,14 +318,15 @@ export class Game extends Scene {
     this.highlightGraphics = this.add.graphics().setDepth(1000);
 
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (!this.groundLayer) return;
       const worldX = pointer.worldX;
       const worldY = pointer.worldY;
       const tileXY = this.groundLayer.worldToTileXY(worldX, worldY, true);
       const tileX = Math.floor(tileXY.x);
       const tileY = Math.floor(tileXY.y);
 
-      const mapWidth = 480;
-      const mapHeight = 480;
+      const mapWidth = this.groundLayer.width;
+      const mapHeight = this.groundLayer.height;
       if (tileX < 0 || tileX >= mapWidth || tileY < 0 || tileY >= mapHeight) return;
 
       this.highlightedTile = { x: tileX, y: tileY };

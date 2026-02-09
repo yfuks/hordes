@@ -26,7 +26,7 @@
         "vite": "^6.3.1"
     },
     "dependencies": {
-        "colyseus.js": "^0.16.22",
+        "colyseus.js": "^0.15.0",
         "phaser": "^3.90.0",
         "terser": "^5.39.0"
     }
