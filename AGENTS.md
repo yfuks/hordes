@@ -214,9 +214,12 @@ send({ type: "ACTION", action: "SEARCH", target: "BUILDING" });
 
 ```
 /game-client
-  /assets
-  /scenes
-  /network
+  /assets          # Tileset constants, asset keys
+  /scenes          # Phaser scenes only (Boot, Preloader, MainMenu, Game, etc.)
+  /network         # Room client, Colyseus connection, map data
+  /animations      # Character/sprite animation registration (idle, walk, special)
+  /map             # Tilemap creation, ground generation, tile highlight / click-to-select
+  /player          # Player controller (placeholder character, movement, idle/special)
 
 /game-server
   /rooms
@@ -228,6 +231,13 @@ send({ type: "ACTION", action: "SEARCH", target: "BUILDING" });
   /protocols
   /constants
 ```
+
+### Game client logic directories (for future usage)
+
+* **`/scenes`** – Phaser scene classes only. Scenes orchestrate by calling into the logic directories; they should stay thin and not contain map generation, animation definitions, or movement logic.
+* **`/animations`** – Register character (or other) atlas animations. Used by the Game scene before creating the player. Add new animation modules here (e.g. zombies, effects).
+* **`/map`** – Tilemap build (server or local fallback), ground tile generation (noise, etc.), and map interaction (e.g. tile highlight, click-to-select). Add procedural helpers or map UI here.
+* **`/player`** – Player character creation, movement, and client-only state (direction, idle/special). Add input-to-intent or other player-specific logic here; keep authority and validation on the server.
 
 ---
 
