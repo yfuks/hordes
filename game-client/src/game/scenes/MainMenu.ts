@@ -4,8 +4,6 @@ import { createRoom, joinRoom } from "../network/roomClient";
 import { textStyles } from "../theme";
 
 export class MainMenu extends Scene {
-  background!: GameObjects.Image;
-  logo!: GameObjects.Image;
   roomInput!: HTMLInputElement;
   statusText!: GameObjects.Text;
 
@@ -14,8 +12,10 @@ export class MainMenu extends Scene {
   }
 
   create() {
-    this.background = this.add.image(512, 384, "background");
-    this.logo = this.add.image(512, 200, "logo");
+    // Placeholder background
+    this.add.rectangle(512, 384, 1024, 768, 0x222222);
+    // Placeholder logo
+    this.add.rectangle(512, 200, 200, 100, 0x444444);
 
     this.statusText = this.add
       .text(512, 670, "", textStyles.status)

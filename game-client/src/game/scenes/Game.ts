@@ -1,27 +1,17 @@
 import { Scene } from "phaser";
 import { getRoomIdFromPage } from "../config";
-import { getMapData, getMapDataOnce, type MapData } from "../network/roomClient";
-import { registerCharacterAnimations } from "../animations/characterAnimations";
-import { createGameMap } from "../map/gameMap";
 import { createPlayerController } from "../player/playerController";
-import { setupTileHighlight } from "../map/tileHighlight";
 
 export interface GameSceneData {
   roomId?: string;
-  /** Server map (passed when MainMenu waited for it); avoids timing issues. */
-  mapData?: MapData;
 }
 
-/** Game scene – top-down view, tilemap-based (per AGENTS.md) */
+/** Game scene – simplified placeholder (no map/assets yet) */
 export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
-  groundLayer!: Phaser.Tilemaps.TilemapLayer;
   msg_text!: Phaser.GameObjects.Text;
-  /** Placeholder character at map center */
-  player!: Phaser.GameObjects.Container;
+  player!: Phaser.GameObjects.Graphics;
   roomId: string | null = null;
-  /** Server map when passed from MainMenu (so we don't rely on state timing). */
-  private mapData: MapData | null = null;
 
   constructor() {
     super("Game");
@@ -30,14 +20,11 @@ export class Game extends Scene {
   init(data: GameSceneData) {
     const raw = data?.roomId ?? getRoomIdFromPage();
     this.roomId = raw != null && raw !== "" && String(raw) !== "undefined" ? String(raw) : null;
-    this.mapData = data?.mapData ?? null;
   }
 
   create() {
     this.camera = this.cameras.main;
     this.input.enabled = true;
-
-    registerCharacterAnimations(this);
 
     if (!this.roomId) {
       this.add
@@ -50,77 +37,13 @@ export class Game extends Scene {
       return;
     }
 
-    const mapData = this.mapData ?? getMapData();
-    if (mapData) {
-      this.createMapAndPlayer(mapData);
-      return;
-    }
-
-    const loadingText = this.add
-      .text(512, 384, "Generating map…", {
-        fontFamily: "Arial",
-        fontSize: 24,
-        color: "#ffffff",
-      })
-      .setOrigin(0.5)
-      .setName("loading-map");
-
-    getMapDataOnce().then(
-      (data) => {
-        if (!this.scene.isActive("Game")) return;
-        loadingText.destroy();
-        this.createMapAndPlayer(data);
-      },
-      () => {
-        if (!this.scene.isActive("Game")) return;
-        loadingText.setText("Failed to load map");
-      }
-    );
-  }
-
-  private createMapAndPlayer(mapData: MapData) {
-    let groundLayer: Phaser.Tilemaps.TilemapLayer;
-    try {
-      groundLayer = createGameMap({ scene: this, mapData });
-    } catch (err) {
-      this.add
-        .text(512, 384, "Tileset not loaded", {
-          fontFamily: "Arial",
-          fontSize: 24,
-          color: "#ff6666",
-        })
-        .setOrigin(0.5);
-      return;
-    }
-
-    this.groundLayer = groundLayer;
-
-    let tileHighlight: ReturnType<typeof setupTileHighlight>;
-
-    const playerController = createPlayerController(this, groundLayer, {
-      onMoveComplete: (tileX, tileY) => {
-        if (
-          tileHighlight.highlightedTile &&
-          tileHighlight.highlightedTile.x === tileX &&
-          tileHighlight.highlightedTile.y === tileY
-        ) {
-          tileHighlight.setHighlightedTile(null);
-          tileHighlight.draw();
-        }
-      },
-    });
+    // Create simple placeholder player
+    const playerController = createPlayerController(this);
     this.player = playerController.player;
-    this.camera.startFollow(this.player);
-
-    tileHighlight = setupTileHighlight({
-      scene: this,
-      groundLayer,
-      onTileSelected: (tileX, tileY) => playerController.moveToTile(tileX, tileY),
-    });
 
     const roomLabel = this.roomId != null && this.roomId !== "" ? `Room: ${this.roomId}` : "No room";
     this.msg_text = this.add
-      .text(512, 40, `${roomLabel} – Top-down view`, {
+      .text(512, 40, `${roomLabel}`, {
         fontFamily: "Arial Black",
         fontSize: 20,
         color: "#ffffff",

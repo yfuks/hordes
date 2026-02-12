@@ -1,0 +1,9 @@
+# Assets Placeholder
+
+This directory will contain game assets:
+- Character sprites and atlases
+- Tileset images
+- UI elements
+- Background images
+
+Currently using programmatic placeholders in the game code.
